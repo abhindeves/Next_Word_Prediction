@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Next Word Probability Engine</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #3498db;
+            --accent: #e74c3c;
+            --light: #ecf0f1;
+            --dark: #2c3e50;
+            --success: #27ae60;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            color: var(--dark);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            width: 95%;
+            max-width: 1200px;
+            max-height: 95vh;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: auto 1fr;
+        }
+        
+        .header {
+            background: var(--primary);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 4px solid var(--secondary);
+        }
+        
+        .header h1 {
+            margin: 0;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        
+        .header p {
+            margin: 0.3rem 0 0;
+            font-size: 0.9rem;
+            opacity: 0.9;
+        }
+        
+        .content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            padding: 1rem;
+            overflow: hidden;
+            height: 100%;
+        }
+        
+        .panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            height: 100%;
+        }
+        
+        .input-section {
+            grid-column: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .input-area {
+            background: var(--light);
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        textarea {
+            width: 100%;
+            flex: 1;
+            min-height: 100px;
+            padding: 10px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            resize: none;
+            transition: border 0.3s;
+        }
+        
+        textarea:focus {
+            outline: none;
+            border-color: var(--secondary);
+        }
+        
+        button {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 0.5rem;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .math-preview {
+            background: #f5f5f5;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Times New Roman', serif;
+            border-left: 4px solid var(--secondary);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .math-preview p {
+            margin: 0 0 0.5rem 0;
+        }
+        
+        .results-section {
+            grid-column: 2;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            gap: 1rem;
+            overflow: hidden;
+        }
+        
+        .probability-display {
+            background: white;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .probability-display h3 {
+            margin: 0 0 0.5rem 0;
+            color: var(--primary);
+            font-size: 1rem;
+        }
+        
+        .probability-list {
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .probability-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            align-items: center;
+            font-size: 0.9rem;
+        }
+        
+        .probability-word {
+            font-weight: 600;
+            color: var(--dark);
+        }
+        
+        .probability-value {
+            font-family: 'Courier New', monospace;
+            background: var(--light);
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 600;
+            color: var(--primary);
+        }
+        
+        .chart-container {
+            height: 200px;
+            position: relative;
+        }
+        
+        .loader {
+            display: none;
+            text-align: center;
+            padding: 1rem;
+        }
+        
+        .loader-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--secondary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        .loader-text {
+            margin-top: 0.5rem;
+            font-weight: 600;
+            color: var(--dark);
+            font-size: 0.9rem;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .error {
+            color: var(--accent);
+            font-weight: 600;
+            margin-top: 0.5rem;
+            font-size: 0.9rem;
+        }
+        
+        .calculation-steps {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-top: 1rem;
+            font-size: 0.85rem;
+            overflow-y: auto;
+            flex: 1;
+        }
+        
+        .calculation-step {
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Next Word Probability Engine</h1>
+            <p>Powered by Google Gemini | Mathematical Language Modeling</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-section">
+                <div class="input-area">
+                    <h3>Input Text</h3>
+                    <textarea id="inputText" placeholder="Type your text here to analyze next word probabilities..."></textarea>
+                    <button id="predictButton">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16">
+                            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0zM4.5 7.5a.5.5 0 0 0 0 1h5.793l-2.147 2.146a.5.5 0 0 0 .708.708l3-3a.5.5 0 0 0 0-.708l-3-3a.5.5 0 1 0-.708.708L10.293 7.5H4.5z"/>
+                        </svg>
+                        Calculate Probabilities
+                    </button>
+                    <div id="error" class="error hidden"></div>
+                </div>
+
+                
+                <div class="calculation-steps" id="calculationSteps">
+                    <h3>Calculation Steps</h3>
+                    <div id="stepsContent">
+                        <p>Enter text and click "Calculate Probabilities" to see the detailed calculations.</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <div id="loader" class="loader hidden">
+                    <div class="loader-spinner"></div>
+                    <div class="loader-text">Computing probability distribution...</div>
+                </div>
+                
+                <div id="results" class="hidden">
+                    <div class="results-container">
+                        <div class="probability-display">
+                            <h3>Top Predicted Next Words</h3>
+                            <div class="probability-list" id="probabilityList"></div>
+                        </div>
+                        
+                        <div class="probability-display">
+                            <h3>Probability Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="predictionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const predictButton = document.getElementById('predictButton');
+            const inputText = document.getElementById('inputText');
+            const loader = document.getElementById('loader');
+            const results = document.getElementById('results');
+            const probabilityList = document.getElementById('probabilityList');
+            const errorElement = document.getElementById('error');
+            const stepsContent = document.getElementById('stepsContent');
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            let predictionChart = null;
+
+            const API_URL = 'http://127.0.0.1:8000/predict';
+
+            predictButton.addEventListener('click', async () => {
+                const text = inputText.value.trim();
+                
+                if (!text) {
+                    showError('Please enter some text to analyze');
+                    return;
+                }
+                
+                // Clear previous results and errors
+                errorElement.classList.add('hidden');
+                results.classList.add('hidden');
+                loader.classList.remove('hidden');
+                
+                if (predictionChart) {
+                    predictionChart.destroy();
+                }
+                
+                try {
+                    const response = await fetch(API_URL, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ text: text }),
+                    });
+                    
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    console.log("API Response:", data); // Debugging log
+                    
+                    // Handle different response formats
+                    let predictions = [];
+                    let calculations = [];
+                    
+                    if (Array.isArray(data)) {
+                        // If response is directly an array of predictions
+                        predictions = data;
+                    } else if (data.predictions) { // Common typo in API responses
+                        predictions = data.predictions || data.predictions;
+                        calculations = data.calculations || [];
+                    } else if (data.predictions) { // Handle typo 'predictions' -> 'predictions'
+                        predictions = data.predictions;
+                        calculations = data.calculations || [];
+                    } else {
+                        // Try to extract predictions from any format
+                        predictions = data.results || data.data || data.words || [];
+                    }
+                    
+                    if (!predictions || predictions.length === 0) {
+                        throw new Error('No predictions returned from the model');
+                    }
+                    
+                    // Ensure predictions have the correct format
+                    predictions = predictions.map(pred => {
+                        if (typeof pred === 'string') {
+                            return { word: pred, probability: 0.1 }; // Default probability if not provided
+                        }
+                        return {
+                            word: pred.word || pred.token || pred.text || 'Unknown',
+                            probability: pred.probability || pred.score || 0
+                        };
+                    });
+                    
+                    // Sort by probability if not already sorted
+                    predictions.sort((a, b) => b.probability - a.probability);
+                    
+                    displayResults(predictions, calculations, text);
+                } catch (error) {
+                    console.error('Prediction failed:', error);
+                    showError(error.message || 'An error occurred while calculating probabilities');
+                } finally {
+                    loader.classList.add('hidden');
+                }
+            });
+            
+            function showError(message) {
+                errorElement.textContent = message;
+                errorElement.classList.remove('hidden');
+            }
+            
+            function displayResults(predictions, calculations, inputText) {
+                // Display the probability list
+                probabilityList.innerHTML = '';
+                
+                predictions.slice(0, 10).forEach((pred, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'probability-item';
+                    
+                    const word = document.createElement('span');
+                    word.className = 'probability-word';
+                    word.textContent = `${index + 1}. ${pred.word}`;
+                    
+                    const value = document.createElement('span');
+                    value.className = 'probability-value';
+                    value.textContent = `${(pred.probability * 100).toFixed(2)}%`;
+                    
+                    item.appendChild(word);
+                    item.appendChild(value);
+                    probabilityList.appendChild(item);
+                });
+                
+                // Display calculation steps
+                stepsContent.innerHTML = '<h4>Calculation Steps for: "' + inputText + '"</h4>';
+                
+                if (calculations && calculations.length > 0) {
+                    calculations.forEach(step => {
+                        const stepDiv = document.createElement('div');
+                        stepDiv.className = 'calculation-step';
+                        stepDiv.innerHTML = `<strong>${step.step || 'Step'}:</strong> ${step.details || step}`;
+                        stepsContent.appendChild(stepDiv);
+                    });
+                } else {
+                    // If no calculations provided, show a generic explanation
+                    stepsContent.innerHTML += `
+                        <div class="calculation-step">
+                            <strong>1. Tokenization:</strong> The input text was broken down into tokens.
+                        </div>
+                        <div class="calculation-step">
+                            <strong>2. Context Encoding:</strong> The model created a numerical representation of the input context.
+                        </div>
+                        <div class="calculation-step">
+                            <strong>3. Probability Calculation:</strong> For each possible next word, the model calculated a score which was converted to a probability using the softmax function.
+                        </div>
+                        <div class="calculation-step">
+                            <strong>4. Top-K Selection:</strong> The ${predictions.length} most likely next words were selected.
+                        </div>
+                    `;
+                }
+                
+                // Create the chart
+                const topPredictions = predictions.slice(0, 5);
+                const labels = topPredictions.map(p => p.word);
+                const data = topPredictions.map(p => p.probability * 100);
+                const backgroundColors = [
+                    'rgba(52, 152, 219, 0.7)',
+                    'rgba(155, 89, 182, 0.7)',
+                    'rgba(26, 188, 156, 0.7)',
+                    'rgba(241, 196, 15, 0.7)',
+                    'rgba(231, 76, 60, 0.7)'
+                ];
+                
+                predictionChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Probability (%)',
+                            data: data,
+                            backgroundColor: backgroundColors,
+                            borderColor: backgroundColors.map(c => c.replace('0.7', '1')),
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.parsed.y.toFixed(2)}% probability`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100,
+                                ticks: {
+                                    callback: function(value) {
+                                        return value + '%';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+                
+                // Show results
+                results.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

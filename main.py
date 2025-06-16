@@ -90,7 +90,7 @@ async def predict_next_word(request: PredictionRequest):
     "{input_text}"
 
     Return ONLY a JSON dictionary with exactly 5 key-value pairs where:
-    - Each key is a likely next word
+    - Each key is a likely next word.
     - Each value is its estimated probability (0-1)
 
     Format example:
